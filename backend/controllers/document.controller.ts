@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import pdf from "pdf-parse";
 import { ChunkService } from "../services/chunk.service";
-import { upsertToPinecone } from "../services/pinecone.store";
+import { upsertToChroma } from "../services/chroma.store";
 import { generateEmbedding } from "../services/embedding.service";
 
 export const uploadDocument = async (
@@ -30,9 +30,9 @@ export const uploadDocument = async (
     const embeddings = await generateEmbedding(chunks);
     console.log(`Generated ${embeddings.length} embeddings`);
 
-    console.log("Storing in Pinecone...");
+    console.log("Storing in Chroma...");
     for (let i = 0; i < chunks.length; i++) {
-      await upsertToPinecone(sessionId, `${i}`, embeddings[i], chunks[i]);
+      await upsertToChroma(sessionId, `${i}`, embeddings[i], chunks[i]);
     }
 
     console.log("Upload successful!");

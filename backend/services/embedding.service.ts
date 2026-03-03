@@ -1,4 +1,4 @@
-import { pipeline } from "@xenova/transformers";
+const { pipeline } = require("@xenova/transformers");
 
 let embedder: any = null;
 
@@ -30,17 +30,9 @@ export async function generateEmbedding(
     const texts = Array.isArray(text) ? text : [text];
 
     const embeddings: number[][] = [];
-    const TARGET_DIMENSION = 1024; // Pinecone index dimension
-
     for (const t of texts) {
       const output = await model(t, { pooling: "mean", normalize: true });
-      let embedding: number[] = Array.from(output.data) as number[];
-
-      // Pad embedding to match Pinecone index dimensions (1024)
-      if (embedding.length < TARGET_DIMENSION) {
-        const padding = new Array(TARGET_DIMENSION - embedding.length).fill(0);
-        embedding = [...embedding, ...padding];
-      }
+      const embedding: number[] = Array.from(output.data) as number[];
 
       embeddings.push(embedding);
     }

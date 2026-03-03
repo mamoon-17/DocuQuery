@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { queryPinecone } from "../services/pinecone.query";
+import { queryChroma } from "../services/chroma.query";
 import { groq } from "../services/groq.service";
 import { generateEmbedding } from "../services/embedding.service";
 
@@ -10,7 +10,7 @@ export const askQuestion = async (req: Request, res: Response) => {
   const embeddings = await generateEmbedding(question);
   const questionEmbedding = embeddings[0];
 
-  const chunks = await queryPinecone(sessionId, questionEmbedding);
+  const chunks = await queryChroma(sessionId, questionEmbedding);
   const context = chunks.join("\n\n");
 
   // Get answer from Groq using the context
