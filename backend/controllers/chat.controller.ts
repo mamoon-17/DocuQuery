@@ -1,30 +1,41 @@
 import { Request, Response } from "express";
 import { queryPinecone } from "../services/pinecone.query";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+import { groq } from "../services/groq.service";
+import { generateEmbedding } from "../services/embedding.service";
 
 export const askQuestion = async (req: Request, res: Response) => {
   const { sessionId, question } = req.body;
 
-  const embedRes = await openai.embeddings.create({
-    model: "text-embedding-3-small",
-    input: question,
-  });
-
-  const questionEmbedding = embedRes.data[0].embedding;
+  // Get embedding for the question using local model
+  const embeddings = await generateEmbedding(question);
+  const questionEmbedding = embeddings[0];
 
   const chunks = await queryPinecone(sessionId, questionEmbedding);
-
   const context = chunks.join("\n\n");
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  // Get answer from Groq using the context
+  const completion = await groq.chat.completions.create({
+    model: "openai/gpt-oss-120b",
     messages: [
-      { role: "system", content: "Answer using only the context." },
+      { role: "system", content: "Answer using only the provided context." },
       { role: "user", content: `Context:\n${context}\n\nQ: ${question}` },
     ],
   });
 
-  res.json({ answer: completion.choices[0].message.content });
+  // Remove markdown formatting from the answer
+  let answer: string = completion.choices[0].message.content ?? "";
+  // Remove markdown formatting: asterisks, backticks, hashes, dashes, bullets, vertical bars, tables
+  answer = answer.replace(/[|*_`#>\-]/g, "");
+  // Remove numbered and bulleted lists
+  answer = answer.replace(/\n\s*\d+\.\s*/g, "\n");
+  answer = answer.replace(/\n\s*[-•]\s*/g, "\n");
+  // Remove markdown table headers and separators
+  answer = answer.replace(/\n?\s*\|\s*/g, " ");
+  answer = answer.replace(/\n?\s*---+\s*/g, " ");
+  // Remove extra spaces and newlines
+  answer = answer
+    .replace(/ +/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+  res.json({ answer });
 };

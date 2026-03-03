@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Upload, FileText, Loader2, CheckCircle2 } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
+import { Upload, FileText, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
 
 interface DocumentUploadProps {
@@ -11,47 +11,79 @@ const DocumentUpload = ({ onUploadSuccess }: DocumentUploadProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback(async (file: File) => {
-    if (file.type !== "application/pdf") {
-      setError("Please upload a PDF file");
-      return;
-    }
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (file.type !== "application/pdf") {
+        setError("Please upload a PDF file");
+        return;
+      }
 
-    setIsUploading(true);
+      setIsUploading(true);
+      setError(null);
+      setUploadedFile(null); // Reset previous upload state
+
+      try {
+        const result = await api.uploadDocument(file);
+        setUploadedFile(file.name);
+        onUploadSuccess(result.sessionId, file.name);
+      } catch (err: any) {
+        const errorMessage =
+          err?.response?.data?.details || err?.message || "Upload failed";
+        setError(errorMessage);
+        console.error("Upload error:", err);
+      } finally {
+        setIsUploading(false);
+        // Reset file input to allow re-uploading the same file
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    },
+    [onUploadSuccess],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    },
+    [handleFile],
+  );
+
+  const handleFileInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) handleFile(file);
+    },
+    [handleFile],
+  );
+
+  const resetUpload = useCallback(() => {
+    setUploadedFile(null);
     setError(null);
-
-    try {
-      const result = await api.uploadDocument(file);
-      setUploadedFile(file.name);
-      onUploadSuccess(result.sessionId, file.name);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setIsUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
-  }, [onUploadSuccess]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
-
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
+  }, []);
 
   if (uploadedFile) {
     return (
       <div className="flex items-center gap-3 rounded-lg bg-accent px-4 py-3 animate-slide-up">
         <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{uploadedFile}</p>
           <p className="text-xs text-muted-foreground">Ready to query</p>
         </div>
+        <button
+          onClick={resetUpload}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Upload New
+        </button>
       </div>
     );
   }
@@ -59,20 +91,25 @@ const DocumentUpload = ({ onUploadSuccess }: DocumentUploadProps) => {
   return (
     <div>
       <label
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         className={`
           relative flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-12
           cursor-pointer transition-all duration-300
-          ${isDragging
-            ? "border-primary bg-accent scale-[1.02]"
-            : "border-border hover:border-primary/50 hover:bg-accent/50"
+          ${
+            isDragging
+              ? "border-primary bg-accent scale-[1.02]"
+              : "border-border hover:border-primary/50 hover:bg-accent/50"
           }
           ${isUploading ? "pointer-events-none opacity-60" : ""}
         `}
       >
         <input
+          ref={fileInputRef}
           type="file"
           accept=".pdf"
           onChange={handleFileInput}
@@ -97,13 +134,26 @@ const DocumentUpload = ({ onUploadSuccess }: DocumentUploadProps) => {
             {isUploading ? "Processing document..." : "Drop your PDF here"}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {isUploading ? "Extracting text & creating embeddings" : "or click to browse"}
+            {isUploading
+              ? "Extracting text & creating embeddings"
+              : "or click to browse"}
           </p>
         </div>
       </label>
 
       {error && (
-        <p className="mt-3 text-sm text-destructive text-center animate-slide-up">{error}</p>
+        <div className="mt-3 flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 animate-slide-up">
+          <XCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-destructive">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="text-xs text-destructive/70 hover:text-destructive mt-1 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
