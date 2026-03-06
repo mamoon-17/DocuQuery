@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  chroma:
+    image: ghcr.io/chroma-core/chroma:latest
+    container_name: chroma
+    command: ["run", "--host", "0.0.0.0", "--port", "8000", "--path", "/data"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./chroma-data:/data
+    # No container healthcheck (some Chroma images don't include curl);
+    # backend will wait for Chroma using KEEPALIVE_WAIT_FOR_CHROMA if needed.
+
+  backend:
+    build: .
+    container_name: docuquery-backend
+    depends_on:
+      - chroma
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    command: ["./start.sh"]
+
+networks:
+  default:
+    driver: bridge

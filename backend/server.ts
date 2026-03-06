@@ -1,6 +1,11 @@
 import "dotenv/config";
 import app from "./app";
+import { startKeepalive } from "./services/keepalive.service";
 
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+const port = Number(process.env.PORT) || 3000;
+
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+  // start keepalive pings to prevent cold starts (pings self and chroma)
+  startKeepalive();
 });
