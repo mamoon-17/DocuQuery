@@ -12,7 +12,7 @@ const Index = () => {
       <header className="flex items-center gap-2 border-b px-6 py-4">
         <FileSearch className="h-6 w-6 text-primary" />
         <h1 className="text-lg font-semibold tracking-tight">
-          Doc<span className="gradient-text">Query</span>
+          Docu<span className="gradient-text">Query</span>
         </h1>
       </header>
 
@@ -47,7 +47,7 @@ const Index = () => {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  GPT-4o powered
+                  AI-powered
                 </span>
               </div>
             </div>
