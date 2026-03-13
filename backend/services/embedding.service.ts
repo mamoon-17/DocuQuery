@@ -1,6 +1,33 @@
 const { pipeline } = require("@xenova/transformers");
 
 let embedder: any = null;
+const embeddingBatchSize = Number(process.env.EMBEDDING_BATCH_SIZE) || 8;
+
+function extractEmbeddings(output: any, batchSize: number): number[][] {
+  if (typeof output?.tolist === "function") {
+    const values = output.tolist();
+    return batchSize === 1 ? [values as number[]] : (values as number[][]);
+  }
+
+  if (output?.data && Array.isArray(output?.dims) && output.dims.length === 2) {
+    const [, columns] = output.dims;
+    return Array.from({ length: batchSize }, (_, rowIndex) => {
+      const start = rowIndex * columns;
+      const end = start + columns;
+      return Array.from(output.data.slice(start, end)) as number[];
+    });
+  }
+
+  if (output?.data) {
+    return [Array.from(output.data) as number[]];
+  }
+
+  if (Array.isArray(output)) {
+    return output.map((row) => Array.from(row?.data ?? row) as number[]);
+  }
+
+  throw new Error("Unexpected embedding output shape");
+}
 
 async function getEmbedder() {
   if (!embedder) {
@@ -32,16 +59,23 @@ export async function generateEmbedding(
   try {
     const model = await getEmbedder();
     const texts = Array.isArray(text) ? text : [text];
-    const output = await model(texts, { pooling: "mean", normalize: true });
 
     if (texts.length === 1) {
-      return [Array.from(output.data) as number[]];
+      const output = await model(texts[0], {
+        pooling: "mean",
+        normalize: true,
+      });
+      return extractEmbeddings(output, 1);
     }
 
-    return Array.from({ length: texts.length }, (_, index) => {
-      const row = output[index];
-      return Array.from(row.data) as number[];
-    });
+    const embeddings: number[][] = [];
+    for (let start = 0; start < texts.length; start += embeddingBatchSize) {
+      const batch = texts.slice(start, start + embeddingBatchSize);
+      const output = await model(batch, { pooling: "mean", normalize: true });
+      embeddings.push(...extractEmbeddings(output, batch.length));
+    }
+
+    return embeddings;
   } catch (error: any) {
     console.error("Error generating embeddings:", error);
     throw new Error(`Embedding generation failed: ${error.message}`);

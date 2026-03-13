@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import pdf from "pdf-parse";
 import { ChunkService } from "../services/chunk.service";
-import { upsertToChroma } from "../services/chroma.store";
+import { upsertManyToChroma } from "../services/chroma.store";
 import { generateEmbedding } from "../services/embedding.service";
 
 export const uploadDocument = async (
@@ -31,9 +31,7 @@ export const uploadDocument = async (
     console.log(`Generated ${embeddings.length} embeddings`);
 
     console.log("Storing in Chroma...");
-    for (let i = 0; i < chunks.length; i++) {
-      await upsertToChroma(sessionId, `${i}`, embeddings[i], chunks[i]);
-    }
+    await upsertManyToChroma(sessionId, chunks, embeddings);
 
     console.log("Upload successful!");
     res.json({
