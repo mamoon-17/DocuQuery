@@ -22,22 +22,26 @@ async function getEmbedder() {
   return embedder;
 }
 
+export async function warmEmbeddingModel(): Promise<void> {
+  await getEmbedder();
+}
+
 export async function generateEmbedding(
   text: string | string[],
 ): Promise<number[][]> {
   try {
     const model = await getEmbedder();
     const texts = Array.isArray(text) ? text : [text];
+    const output = await model(texts, { pooling: "mean", normalize: true });
 
-    const embeddings: number[][] = [];
-    for (const t of texts) {
-      const output = await model(t, { pooling: "mean", normalize: true });
-      const embedding: number[] = Array.from(output.data) as number[];
-
-      embeddings.push(embedding);
+    if (texts.length === 1) {
+      return [Array.from(output.data) as number[]];
     }
 
-    return embeddings;
+    return Array.from({ length: texts.length }, (_, index) => {
+      const row = output[index];
+      return Array.from(row.data) as number[];
+    });
   } catch (error: any) {
     console.error("Error generating embeddings:", error);
     throw new Error(`Embedding generation failed: ${error.message}`);
