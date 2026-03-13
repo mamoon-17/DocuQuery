@@ -5,14 +5,30 @@ import chatRoutes from "./routes/chat.routes";
 
 const app = express();
 
+function normalizeOrigin(origin: string): string {
+  return origin.trim().replace(/\/$/, "");
+}
+
 const allowedOrigins = [
   "https://doc-query-nu.vercel.app",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   ...(process.env.FRONTEND_URL?.split(",").map((origin: string) =>
-    origin.trim(),
+    normalizeOrigin(origin),
   ) || []),
-].filter(Boolean);
+]
+  .filter(Boolean)
+  .map(normalizeOrigin);
+
+function isAllowedOrigin(origin: string): boolean {
+  const normalized = normalizeOrigin(origin);
+  if (allowedOrigins.includes(normalized)) {
+    return true;
+  }
+
+  // Allow Vercel previews for this project name pattern.
+  return /^https:\/\/doc-query(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(normalized);
+}
 
 const corsOptions: cors.CorsOptions = {
   origin: (
@@ -22,11 +38,12 @@ const corsOptions: cors.CorsOptions = {
     // Allow non-browser requests (curl, server-to-server) with no Origin header.
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       return callback(null, true);
     }
 
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
+    console.warn(`CORS blocked for origin: ${origin}`);
+    return callback(null, false);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],

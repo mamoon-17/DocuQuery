@@ -6,7 +6,13 @@ const embeddingBatchSize = Number(process.env.EMBEDDING_BATCH_SIZE) || 8;
 function extractEmbeddings(output: any, batchSize: number): number[][] {
   if (typeof output?.tolist === "function") {
     const values = output.tolist();
-    return batchSize === 1 ? [values as number[]] : (values as number[][]);
+    if (batchSize === 1) {
+      if (Array.isArray(values?.[0])) {
+        return [values[0] as number[]];
+      }
+      return [values as number[]];
+    }
+    return values as number[][];
   }
 
   if (output?.data && Array.isArray(output?.dims) && output.dims.length === 2) {

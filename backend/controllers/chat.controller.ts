@@ -8,7 +8,20 @@ export const askQuestion = async (req: Request, res: Response) => {
 
   // Get embedding for the question using local model
   const embeddings = await generateEmbedding(question);
-  const questionEmbedding = embeddings[0];
+  const rawQuestionEmbedding = embeddings[0] as unknown;
+  const questionEmbedding =
+    Array.isArray(rawQuestionEmbedding) &&
+    Array.isArray((rawQuestionEmbedding as unknown[])[0])
+      ? (rawQuestionEmbedding as number[][])[0]
+      : (rawQuestionEmbedding as number[]);
+
+  if (
+    !Array.isArray(questionEmbedding) ||
+    questionEmbedding.length === 0 ||
+    !questionEmbedding.every((value) => Number.isFinite(value))
+  ) {
+    throw new Error("Invalid question embedding shape");
+  }
 
   const chunks = await queryChroma(sessionId, questionEmbedding);
   const context = chunks.join("\n\n");
